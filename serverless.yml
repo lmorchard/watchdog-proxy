@@ -1,13 +1,13 @@
-service: sqs-worker-serverless
+service: lmorchard-sqs-worker-serverless
 
 plugins:
   - serverless-sqs-alarms-plugin
 
 provider:
   name: aws
-  runtime: nodejs4.3
+  runtime: nodejs8.10
   stage: dev
-  region: eu-west-1
+  region: us-east-1
   memorySize: 128
   iamRoleStatements:
   - Effect: Allow
@@ -21,8 +21,15 @@ provider:
     Resource: arn:aws:lambda:*:*:function:${self:custom.process}
   - Effect: Allow
     Action:
+      - sqs:ChangeMessageVisibility
+      - sqs:ChangeMessageVisibilityBatch
       - sqs:DeleteMessage
+      - sqs:DeleteMessageBatch
+      - sqs:GetQueueAttributes
+      - sqs:GetQueueUrl
       - sqs:ReceiveMessage
+      - sqs:SendMessage
+      - sqs:SendMessageBatch
     Resource: arn:aws:sqs:*:*:${self:custom.sqs}
 
 custom:
@@ -53,6 +60,17 @@ package:
     - test/**
 
 functions:
+  enqueue:
+    handler: functions/enqueue.handler
+    name: ${self:custom.prefix}-enqueue
+    environment:
+      config: ${self:custom.config}
+      QueueName: ${self:custom.sqs}
+    events:
+      - http:
+          path: enqueue
+          method: get
+
   scale:
     timeout: 10
     handler: functions/scale.handler

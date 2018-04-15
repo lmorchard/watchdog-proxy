@@ -24,7 +24,7 @@
   "author": "Sebastian Müller <mail@sbstjn.com>",
   "license": "MIT",
   "devDependencies": {
-    "aws-sdk": "^2.27.0",
+    "aws-sdk": "^2.224.1",
     "jasmine-data-provider": "^2.2.0",
     "jest": "^19.0.2",
     "serverless": "^1.8.0",
@@ -42,6 +42,7 @@
     ]
   },
   "dependencies": {
+    "onchange": "^3.3.0",
     "serverless-sqs-alarms-plugin": "^0.0.2"
   }
 }

@@ -11,6 +11,7 @@ module.exports.handler = function (event, context, callback) {
 
   Q.item(
     item => new Promise(resolve => {
+      console.log("PROCESS", item);
       resolve()
     })
   )
