@@ -1,7 +1,29 @@
-service: lmorchard-sqs-worker-serverless
+service: watchdog-proxy-lmorchard
 
 plugins:
   - serverless-sqs-alarms-plugin
+
+custom:
+  region: ${self:provider.region}
+  stage: ${opt:stage, self:provider.stage}
+  prefix: ${self:service}-${self:custom.stage}
+  process: ${self:custom.prefix}-process
+  config: ${self:custom.prefix}-config
+  rateLimitTable: ${self:custom.prefix}-ratelimit
+  locksTable: ${self:custom.prefix}-locks
+  sns: ${self:custom.prefix}-trigger
+  sqs: ${self:custom.prefix}-messages
+  contentBucket: ${self:custom.prefix}-content
+  sqs-alarms:
+    - queue: ${self:custom.sqs}
+      topic: ${self:custom.sns}
+      thresholds:
+        - 1
+        - 50
+        - 100
+        - 500
+        - 1000
+        - 5000
 
 provider:
   name: aws
@@ -14,7 +36,14 @@ provider:
     Action:
       - dynamodb:GetItem
       - dynamodb:PutItem
-    Resource: arn:aws:dynamodb:*:*:table/${self:custom.config}
+      - dynamodb:DeleteItem
+      - dynamodb:UpdateItem
+      - dynamodb:Query
+      - dynamodb:Scan
+    Resource:
+      - arn:aws:dynamodb:*:*:table/${self:custom.config}
+      - arn:aws:dynamodb:*:*:table/${self:custom.rateLimitTable}
+      - arn:aws:dynamodb:*:*:table/${self:custom.locksTable}
   - Effect: Allow
     Action:
       - lambda:InvokeFunction
@@ -31,75 +60,29 @@ provider:
       - sqs:SendMessage
       - sqs:SendMessageBatch
     Resource: arn:aws:sqs:*:*:${self:custom.sqs}
-
-custom:
-  region: ${self:provider.region}
-  stage: ${opt:stage, self:provider.stage}
-  prefix: ${self:custom.stage}-${self:service}
-  process: ${self:custom.prefix}-process
-  config: ${self:custom.prefix}-config
-  sns: ${self:custom.prefix}-trigger
-  sqs: ${self:custom.prefix}-messages
-
-  sqs-alarms:
-    - queue: ${self:custom.sqs}
-      topic: ${self:custom.sns}
-      thresholds:
-        - 1
-        - 50
-        - 100
-        - 500
-        - 1000
-        - 5000
-
-package:
-  exclude:
-    - docs/**
-    - helpers/**
-    - node_modules/**
-    - test/**
-
-functions:
-  enqueue:
-    handler: functions/enqueue.handler
-    name: ${self:custom.prefix}-enqueue
-    environment:
-      config: ${self:custom.config}
-      QueueName: ${self:custom.sqs}
-    events:
-      - http:
-          path: enqueue
-          method: get
-
-  scale:
-    timeout: 10
-    handler: functions/scale.handler
-    name: ${self:custom.prefix}-scale
-    environment:
-      config: ${self:custom.config}
-    events:
-      - sns: ${self:custom.sns}
-
-  worker:
-    timeout: 10
-    handler: functions/worker.handler
-    name: ${self:custom.prefix}-worker
-    environment:
-      config: ${self:custom.config}
-      process: ${self:custom.process}
-    events:
-      - schedule: rate(1 minute)
-
-  process:
-    timeout: 60
-    handler: functions/process.handler
-    name: ${self:custom.prefix}-process
-    environment:
-      region: ${self:custom.region}
-      sqs: ${self:custom.sqs}
+  - Effect: Allow
+    Action:
+      - s3:GetObject
+      - s3:PutObject
+      - s3:PutObjectAcl
+      - s3:DeleteObject
+      - s3:ListBucket
+    Resource:
+      - arn:aws:s3:::${self:custom.contentBucket}
+      - arn:aws:s3:::${self:custom.contentBucket}/*
 
 resources:
   Resources:
+
+    Content:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.contentBucket}
+        LifecycleConfiguration:
+          Rules:
+            - Id: DailyCleanup
+              Status: Enabled
+              ExpirationInDays: 30
 
     Messages:
       Type: AWS::SQS::Queue
@@ -134,3 +117,81 @@ resources:
           ReadCapacityUnits: 5
           WriteCapacityUnits: 5
 
+    Locks:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.locksTable}
+        AttributeDefinitions:
+          - AttributeName: lockType
+            AttributeType: S
+        KeySchema:
+          - AttributeName: lockType
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+
+    RateLimit:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.rateLimitTable}
+        AttributeDefinitions:
+          - AttributeName: requestID
+            AttributeType: S
+        KeySchema:
+          - AttributeName: requestID
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+
+package:
+  exclude:
+    - docs/**
+    - helpers/**
+    - test/**
+
+functions:
+
+  enqueue:
+    handler: functions/enqueue.handler
+    name: ${self:custom.prefix}-enqueue
+    environment:
+      CONFIG: ${self:custom.config}
+      QUEUE_NAME: ${self:custom.sqs}
+      LOCKS_TABLE: ${self:custom.locksTable}
+      CONTENT_BUCKET: ${self:custom.contentBucket}
+    events:
+      - http:
+          path: enqueue
+          method: get
+
+  scale:
+    timeout: 10
+    handler: functions/scale.handler
+    name: ${self:custom.prefix}-scale
+    environment:
+      config: ${self:custom.config}
+    events:
+      - sns: ${self:custom.sns}
+
+  worker:
+    timeout: 10
+    handler: functions/worker.handler
+    name: ${self:custom.prefix}-worker
+    environment:
+      config: ${self:custom.config}
+      process: ${self:custom.process}
+    events:
+      - schedule: rate(1 minute)
+
+  process:
+    timeout: 60
+    handler: functions/process.handler
+    name: ${self:custom.prefix}-process
+    environment:
+      region: ${self:custom.region}
+      sqs: ${self:custom.sqs}

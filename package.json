@@ -27,6 +27,7 @@
     "aws-sdk": "^2.224.1",
     "jasmine-data-provider": "^2.2.0",
     "jest": "^19.0.2",
+    "onchange": "^3.3.0",
     "serverless": "^1.8.0",
     "snazzy": "^6.0.0",
     "standard": "^9.0.2"
@@ -42,7 +43,10 @@
     ]
   },
   "dependencies": {
-    "onchange": "^3.3.0",
-    "serverless-sqs-alarms-plugin": "^0.0.2"
+    "alai": "^1.0.3",
+    "dynamodb-lock-client": "^0.2.3",
+    "lawos": "^1.1.5",
+    "serverless-sqs-alarms-plugin": "^0.0.2",
+    "uuid": "^3.2.1"
   }
 }
