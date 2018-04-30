@@ -6,7 +6,7 @@
 
 Development is currently done directly on Amazon Web Services. So, you'll need to [sign up for an account](https://aws.amazon.com/) or [request a Dev IAM account from Mozilla Cloud Operations](https://mana.mozilla.org/wiki/display/SVCOPS/Requesting+A+Dev+IAM+account+from+Cloud+Operations). (The latter is available only to Mozillians.)
 
-Optional: [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/installing.html). This gives you tools to work with AWS from the command line, which is very handy but not absolutely necessary.
+Optional: [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/installing.html). This gives you tools to work with AWS from the command line.
 
 Ensure [node.js 8.11.1](https://nodejs.org/en/) or newer is installed.
 
@@ -18,7 +18,7 @@ If you already have an AWS key ID and secret, [you can follow the quick start do
 
 If you don't already have an AWS key ID and secret, [follow the guide to acquire and configure these credentials](https://serverless.com/framework/docs/providers/aws/guide/credentials/).
 
-Choose a stage name to use for development - e.g. mine is `lmorchard`.
+Choose a unique stage name to use for development - e.g. mine is `lmorchard`. This is used in naming all the pieces of the stack you deploy, in order to distinguish them from any other stack.
 
 Try deploying the service to AWS: `./node_modules/.bin/serverless deploy --stage <stage name>`
 
@@ -57,3 +57,10 @@ functions:
 If everything was successful, you should now have a running stack with an HTTPS resource to accept requests listed as one of the endpoints.
 
 To remove this stack from AWS and delete everything, run `./node_modules/.bin/serverless remove --stage <stage name>`
+
+The [Serverless docs on workflow are useful](https://serverless.com/framework/docs/providers/aws/guide/workflow/). These are also a few useful commands for monitoring log output of lambda functions in this project:
+```
+serverless logs -f accept -t
+serverless logs -f pollQueue -t
+serverless logs -f processQueueItem -t
+```
