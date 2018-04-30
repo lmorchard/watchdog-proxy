@@ -1,29 +1,22 @@
 service: watchdog-proxy-lmorchard
 
 plugins:
-  - serverless-sqs-alarms-plugin
+  - serverless-s3-remover
 
 custom:
   region: ${self:provider.region}
   stage: ${opt:stage, self:provider.stage}
   prefix: ${self:service}-${self:custom.stage}
-  process: ${self:custom.prefix}-process
+  process: ${self:custom.prefix}-processQueueItem
   config: ${self:custom.prefix}-config
   rateLimitTable: ${self:custom.prefix}-ratelimit
-  locksTable: ${self:custom.prefix}-locks
+  mutexesTable: ${self:custom.prefix}-mutexes
   sns: ${self:custom.prefix}-trigger
   sqs: ${self:custom.prefix}-messages
   contentBucket: ${self:custom.prefix}-content
-  sqs-alarms:
-    - queue: ${self:custom.sqs}
-      topic: ${self:custom.sns}
-      thresholds:
-        - 1
-        - 50
-        - 100
-        - 500
-        - 1000
-        - 5000
+  remover:
+    buckets:
+      - ${self:custom.contentBucket}
 
 provider:
   name: aws
@@ -43,7 +36,7 @@ provider:
     Resource:
       - arn:aws:dynamodb:*:*:table/${self:custom.config}
       - arn:aws:dynamodb:*:*:table/${self:custom.rateLimitTable}
-      - arn:aws:dynamodb:*:*:table/${self:custom.locksTable}
+      - arn:aws:dynamodb:*:*:table/${self:custom.mutexesTable}
   - Effect: Allow
     Action:
       - lambda:InvokeFunction
@@ -74,7 +67,7 @@ provider:
 resources:
   Resources:
 
-    Content:
+    S3BucketContent:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:custom.contentBucket}
@@ -82,7 +75,20 @@ resources:
           Rules:
             - Id: DailyCleanup
               Status: Enabled
-              ExpirationInDays: 30
+              ExpirationInDays: 1
+
+    PollQueueLambdaPermissionContentS3:
+      Type: "AWS::Lambda::Permission"
+      Properties:
+        FunctionName:
+          "Fn::GetAtt":
+            - PollQueueLambdaFunction
+            - Arn
+        Principal: "s3.amazonaws.com"
+        Action: "lambda:InvokeFunction"
+        SourceAccount:
+          Ref: AWS::AccountId
+        SourceArn: "arn:aws:s3:::${self:custom.contentBucket}"
 
     Messages:
       Type: AWS::SQS::Queue
@@ -117,15 +123,15 @@ resources:
           ReadCapacityUnits: 5
           WriteCapacityUnits: 5
 
-    Locks:
+    Mutexes:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: ${self:custom.locksTable}
+        TableName: ${self:custom.mutexesTable}
         AttributeDefinitions:
-          - AttributeName: lockType
+          - AttributeName: key
             AttributeType: S
         KeySchema:
-          - AttributeName: lockType
+          - AttributeName: key
             KeyType: HASH
         ProvisionedThroughput:
           ReadCapacityUnits: 5
@@ -136,10 +142,10 @@ resources:
       Properties:
         TableName: ${self:custom.rateLimitTable}
         AttributeDefinitions:
-          - AttributeName: requestID
+          - AttributeName: requestId
             AttributeType: S
         KeySchema:
-          - AttributeName: requestID
+          - AttributeName: requestId
             KeyType: HASH
         ProvisionedThroughput:
           ReadCapacityUnits: 5
@@ -156,42 +162,44 @@ package:
 
 functions:
 
-  enqueue:
-    handler: functions/enqueue.handler
-    name: ${self:custom.prefix}-enqueue
+  accept:
+    handler: functions/accept.handler
+    name: ${self:custom.prefix}-accept
     environment:
       CONFIG: ${self:custom.config}
       QUEUE_NAME: ${self:custom.sqs}
-      LOCKS_TABLE: ${self:custom.locksTable}
+      MUTEXES_TABLE: ${self:custom.mutexesTable}
+      RATE_LIMIT_TABLE: ${self:custom.rateLimitTable}
       CONTENT_BUCKET: ${self:custom.contentBucket}
     events:
       - http:
-          path: enqueue
+          path: accept
           method: get
 
-  scale:
-    timeout: 10
-    handler: functions/scale.handler
-    name: ${self:custom.prefix}-scale
+  pollQueue:
+    timeout: 60
+    handler: functions/pollQueue.handler
+    name: ${self:custom.prefix}-pollQueue
     environment:
-      config: ${self:custom.config}
-    events:
-      - sns: ${self:custom.sns}
-
-  worker:
-    timeout: 10
-    handler: functions/worker.handler
-    name: ${self:custom.prefix}-worker
-    environment:
-      config: ${self:custom.config}
-      process: ${self:custom.process}
+      CONFIG: ${self:custom.config}
+      QUEUE_NAME: ${self:custom.sqs}
+      MUTEXES_TABLE: ${self:custom.mutexesTable}
+      RATE_LIMIT_TABLE: ${self:custom.rateLimitTable}
+      CONTENT_BUCKET: ${self:custom.contentBucket}
+      PROCESS_QUEUE_FUNCTION: ${self:custom.process}
     events:
       - schedule: rate(1 minute)
+      - s3:
+          bucket: content
+          event: s3:ObjectCreated:*
 
-  process:
+  processQueueItem:
     timeout: 60
-    handler: functions/process.handler
-    name: ${self:custom.prefix}-process
+    handler: functions/processQueueItem.handler
+    name: ${self:custom.process}
     environment:
-      region: ${self:custom.region}
-      sqs: ${self:custom.sqs}
+      CONFIG: ${self:custom.config}
+      QUEUE_NAME: ${self:custom.sqs}
+      MUTEXES_TABLE: ${self:custom.mutexesTable}
+      RATE_LIMIT_TABLE: ${self:custom.rateLimitTable}
+      CONTENT_BUCKET: ${self:custom.contentBucket}
