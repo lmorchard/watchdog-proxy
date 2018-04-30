@@ -2,7 +2,7 @@
 
 ## Development
 
-### Quickstart
+### Quickstart Notes
 
 Development is currently done directly on Amazon Web Services. So, you'll need to [sign up for an account](https://aws.amazon.com/) or [request a Dev IAM account from Mozilla Cloud Operations](https://mana.mozilla.org/wiki/display/SVCOPS/Requesting+A+Dev+IAM+account+from+Cloud+Operations). (The latter is available only to Mozillians.)
 
@@ -58,9 +58,16 @@ If everything was successful, you should now have a running stack with an HTTPS 
 
 To remove this stack from AWS and delete everything, run `./node_modules/.bin/serverless remove --stage <stage name>`
 
-The [Serverless docs on workflow are useful](https://serverless.com/framework/docs/providers/aws/guide/workflow/). These are also a few useful commands for monitoring log output of lambda functions in this project:
+The [Serverless docs on workflow are useful](https://serverless.com/framework/docs/providers/aws/guide/workflow/). 
+
+These are also a few useful example commands:
 ```
-serverless logs -f accept -t
-serverless logs -f pollQueue -t
-serverless logs -f processQueueItem -t
+# Tail logs from lambda functions
+serverless logs --stage lmorchard -f accept -t
+serverless logs --stage lmorchard -f pollQueue -t
+serverless logs --stage lmorchard -f processQueueItem -t
+
+# Re-deploy an individual function on file changes
+onchange 'functions/*.js' 'lib/*.js' -iv -- serverless deploy --stage lmorchard -f processQueueItem
 ```
+Depending on your shell PATH variable, you may want to use `npm install -g serverless onchange` to make these commands work. That, or set up [shell auto fallback with npx](https://github.com/zkat/npx#shell-auto-fallback).

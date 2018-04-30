@@ -27,7 +27,7 @@ module.exports.handler = async function(
   const result = await s3.putObject({
     Bucket: CONTENT_BUCKET,
     Key: requestId,
-    Body: "THIS IS A TEST"
+    Body: "THIS WILL BE AN IMAGE SOMEDAY"
   });
   responseBody.s3Result = result;
 

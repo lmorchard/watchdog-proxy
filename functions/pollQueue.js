@@ -15,7 +15,7 @@ const RATE_LIMIT = 5;
 const RATE_PERIOD = 1;
 
 const now = () => Math.floor(Date.now() / 1000);
-const ttl = () => now() + 60;
+const ttl = () => now() + (RATE_PERIOD * 5);
 
 module.exports.handler = async function(event, context) {
   const unlock = promisify(await mutex.lock("rateLimit", 2000));
