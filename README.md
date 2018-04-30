@@ -1,50 +1,59 @@
-# ⚡️ SQS Worker with Serverless
+# watchdog-proxy
 
-[![license](https://img.shields.io/github/license/sbstjn/lawos.svg)](https://github.com/sbstjn/sqs-worker-serverless/blob/master/LICENSE.md)
-[![CircleCI](https://img.shields.io/circleci/project/github/sbstjn/sqs-worker-serverless/master.svg)](https://circleci.com/gh/sbstjn/sqs-worker-serverless)
+## Development
 
-Experiment for an Amazon SQS worker with AWS Lambda using [lawos](https://github.com/sbstjn/lawos) and [serverless](https://serverless.com).
+### Quickstart
 
-More details: [Serverless Amazon SQS Worker with AWS Lambda](https://sbstjn.com/serverless-sqs-worker-with-aws-lambda.html)
+Development is currently done directly on Amazon Web Services. So, you'll need to [sign up for an account](https://aws.amazon.com/) or [request a Dev IAM account from Mozilla Cloud Operations](https://mana.mozilla.org/wiki/display/SVCOPS/Requesting+A+Dev+IAM+account+from+Cloud+Operations). (The latter is available only to Mozillians.)
 
-## Setup
+Optional: [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/installing.html). This gives you tools to work with AWS from the command line, which is very handy but not absolutely necessary.
 
-- SQS Queue with your messages
-- SNS Topic to handle CloudWatch Alarms
-- DynamoDB table to persist configuration
-- CloudWatch Schedule as cron replacement
-- Three (`scale`, `worker`, `process`) AWS Lambda functions
+Ensure [node.js 8.11.1](https://nodejs.org/en/) or newer is installed.
 
-## Workflow
+Clone the project repository - e.g. `git clone git@github.com:mozilla/watchdog-proxy.git`
 
-- CloudWatch Alarms on queue length post to SNS
-- SNS Topic triggers `scale` Lambda function
-- Function `scale` updates configuration in DynamoDB 
-- CloudWatch Schedule invokes `worker` every `x` minute(s)
-- Function `worker` reads configuration from DynamoDB
-- Function `worker` invokes `process` function(s)
+Install all the dependencies for the project: `cd watchdog-proxy && npm install`
 
-## Auto-Scaling with CloudWatch Alerts
+If you already have an AWS key ID and secret, [you can follow the quick start docs for Serverless to configure your credentials](https://serverless.com/framework/docs/providers/aws/guide/credentials#quick-setup)
 
-![](./docs/scale.png) 
+If you don't already have an AWS key ID and secret, [follow the guide to acquire and configure these credentials](https://serverless.com/framework/docs/providers/aws/guide/credentials/).
 
-## Workers with CloudWatch Schedule
+Choose a stage name to use for development - e.g. mine is `lmorchard`.
 
-![](./docs/worker.png)
+Try deploying the service to AWS: `./node_modules/.bin/serverless deploy --stage <stage name>`
 
-## Deploy
-
-```bash
-$ > yarn install
-$ > yarn deploy
+You should see output like the following:
+```
+lmorc@Preciso:~/devel/watchdog-proxy$ ./node_modules/.bin/serverless deploy --stage lmorchard
+Serverless: Packaging service...
+Serverless: Excluding development dependencies...
+Serverless: Creating Stack...
+Serverless: Checking Stack create progress...
+.....
+Serverless: Stack create finished...
+Serverless: Uploading CloudFormation file to S3...
+Serverless: Uploading artifacts...
+Serverless: Uploading service .zip file to S3 (6.39 MB)...
+Serverless: Validating template...
+Serverless: Updating Stack...
+Serverless: Checking Stack update progress...
+...........................................................................
+Serverless: Stack update finished...
+Service Information
+service: watchdog-proxy
+stage: lmorchard
+region: us-east-1
+stack: watchdog-proxy-lmorchard
+api keys:
+  None
+endpoints:
+  GET - https://30r00qsyhf.execute-api.us-east-1.amazonaws.com/lmorchard/accept
+functions:
+  accept: watchdog-proxy-lmorchard-accept
+  pollQueue: watchdog-proxy-lmorchard-pollQueue
+  processQueueItem: watchdog-proxy-lmorchard-processQueueItem
 ```
 
-## Add noise to SQS
+If everything was successful, you should now have a running stack with an HTTPS resource to accept requests listed as one of the endpoints.
 
-You should have some data in your queue to test this setup. Use [wrk](https://github.com/wg/wrk) to send messages to SQS, but make sure to enable [anonymous access to sendMessage](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/acp-overview.html#anonQueues) for your queue first!
-
-```
-$ > wrk -c35 -d60 -t35 \
-    -s helpers/wrk.lua \
-    https://sqs.REGION.amazonaws.com/ACCOUNT-ID/YourQueueName
-```
+To remove this stack from AWS and delete everything, run `./node_modules/.bin/serverless remove --stage <stage name>`

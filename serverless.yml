@@ -1,4 +1,4 @@
-service: watchdog-proxy-lmorchard
+service: watchdog-proxy
 
 plugins:
   - serverless-s3-remover
