@@ -189,10 +189,7 @@ functions:
       PROCESS_QUEUE_FUNCTION: ${self:custom.process}
     events:
       - schedule: rate(1 minute)
-      - s3:
-          bucket: content
-          event: s3:ObjectCreated:*
-
+  
   processQueueItem:
     timeout: 60
     handler: functions/processQueueItem.handler

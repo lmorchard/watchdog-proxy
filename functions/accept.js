@@ -43,9 +43,6 @@ module.exports.handler = async function(
 
   return {
     statusCode: responseCode,
-    headers: {
-      "x-custom-header": "my custom header value"
-    },
     body: JSON.stringify(responseBody)
   };
 };
