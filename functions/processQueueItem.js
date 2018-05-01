@@ -26,7 +26,7 @@ module.exports.handler = async function(
       Key: requestId
     });
 
-    const response = await request(`https://webhook.site/1d7d622c-b6f6-472a-98cc-b3326743a667?requestId=${requestId}`);
+    const response = await request(`https://webhook.site/8144d2bb-75cf-4e21-88c4-8442e63c0e60?requestId=${requestId}`);
   } catch (err) {
     console.log("REQUEST ERROR", err);
   }
