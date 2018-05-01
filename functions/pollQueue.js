@@ -13,7 +13,7 @@ const {
 
 const RATE_LIMIT = 5;
 const RATE_PERIOD = 1;
-const POLL_DELAY = 10;
+const POLL_DELAY = 50;
 
 const now = () => Math.floor(Date.now() / 1000);
 const ttl = () => now() + (RATE_PERIOD * 5);
@@ -41,26 +41,25 @@ module.exports.handler = async function(event, context) {
 
 async function pollQueue(context) {
   // Get a mutex lock on for rateLimiting
-  const unlock = promisify(await mutex.lock("rateLimit"));
+  //const unlock = promisify(await mutex.lock("rateLimit"));
 
-  // Scan hits within the rate limit time window
-  const scanData = await dbd.scan({
-    TableName: RATE_LIMIT_TABLE,
-    FilterExpression: "ts > :min_ts",
-    ExpressionAttributeValues: { ":min_ts": now() - RATE_PERIOD }
-  });
+  // Calculate seconds remaining for poller execution, using maximum for
+  // long poll or whatever time we have left
+  const WaitTimeSeconds = Math.min(20,
+    Math.floor(context.getRemainingTimeInMillis() / 1000) - 1);
+  if (WaitTimeSeconds > 0) {
+    // Scan hits within the rate limit time window
+    const scanData = await dbd.scan({
+      TableName: RATE_LIMIT_TABLE,
+      FilterExpression: "ts > :min_ts",
+      ExpressionAttributeValues: { ":min_ts": now() - RATE_PERIOD }
+    });
 
-  // Calculate available rate limit from scan count
-  const rateRemaining = RATE_LIMIT - scanData.Count;
-  if (rateRemaining <= 0) {
-    console.log("Rate limited");
-  } else {    
-    // Calculate seconds remaining for poller execution, using maximum for
-    // long poll or whatever time we have left
-    const WaitTimeSeconds = Math.min(20,
-      Math.floor(context.getRemainingTimeInMillis() / 1000) - 1);
-
-    if (WaitTimeSeconds > 0) {
+    // Calculate available rate limit from scan count
+    const rateRemaining = RATE_LIMIT - scanData.Count;
+    if (rateRemaining <= 0) {
+      console.log("Rate limited");
+    } else {    
       // Long-poll for SQS messages up to rate limit or execution timeout
       const { QueueUrl } = await sqs.getQueueUrl({ QueueName: QUEUE_NAME });
       const receiveResult = await sqs.receiveMessage({
@@ -95,5 +94,5 @@ async function pollQueue(context) {
     }
   }
 
-  await unlock();
+  //await unlock();
 }

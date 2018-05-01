@@ -21,16 +21,20 @@ module.exports.handler = async function(
   },
   context
 ) {
+  console.time("accept");
   const responseCode = 200;
   const responseBody = { requestId };
 
+  console.time("acceptS3");
   const result = await s3.putObject({
     Bucket: CONTENT_BUCKET,
     Key: requestId,
     Body: "THIS WILL BE AN IMAGE SOMEDAY"
   });
   responseBody.s3Result = result;
+  console.timeEnd("acceptS3");
 
+  console.time("acceptSQS");
   const { QueueUrl } = await sqs.getQueueUrl({ QueueName: QUEUE_NAME });
   const { MessageId } = await sqs.sendMessage({
     MessageBody: JSON.stringify({
@@ -40,7 +44,9 @@ module.exports.handler = async function(
     QueueUrl
   });
   responseBody.sqsResult = "SUCCESS " + MessageId;
+  console.timeEnd("acceptSQS");
 
+  console.timeEnd("accept");
   return {
     statusCode: responseCode,
     body: JSON.stringify(responseBody)
