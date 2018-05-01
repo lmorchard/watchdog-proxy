@@ -9,8 +9,6 @@ custom:
   prefix: ${self:service}-${self:custom.stage}
   process: ${self:custom.prefix}-processQueueItem
   config: ${self:custom.prefix}-config
-  rateLimitTable: ${self:custom.prefix}-ratelimit
-  mutexesTable: ${self:custom.prefix}-mutexes
   sns: ${self:custom.prefix}-trigger
   sqs: ${self:custom.prefix}-messages
   contentBucket: ${self:custom.prefix}-content
@@ -35,8 +33,6 @@ provider:
       - dynamodb:Scan
     Resource:
       - arn:aws:dynamodb:*:*:table/${self:custom.config}
-      - arn:aws:dynamodb:*:*:table/${self:custom.rateLimitTable}
-      - arn:aws:dynamodb:*:*:table/${self:custom.mutexesTable}
   - Effect: Allow
     Action:
       - lambda:InvokeFunction
@@ -77,19 +73,6 @@ resources:
               Status: Enabled
               ExpirationInDays: 1
 
-    PollQueueLambdaPermissionContentS3:
-      Type: "AWS::Lambda::Permission"
-      Properties:
-        FunctionName:
-          "Fn::GetAtt":
-            - PollQueueLambdaFunction
-            - Arn
-        Principal: "s3.amazonaws.com"
-        Action: "lambda:InvokeFunction"
-        SourceAccount:
-          Ref: AWS::AccountId
-        SourceArn: "arn:aws:s3:::${self:custom.contentBucket}"
-
     Messages:
       Type: AWS::SQS::Queue
       Properties:
@@ -123,37 +106,6 @@ resources:
           ReadCapacityUnits: 5
           WriteCapacityUnits: 5
 
-    Mutexes:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:custom.mutexesTable}
-        AttributeDefinitions:
-          - AttributeName: key
-            AttributeType: S
-        KeySchema:
-          - AttributeName: key
-            KeyType: HASH
-        ProvisionedThroughput:
-          ReadCapacityUnits: 5
-          WriteCapacityUnits: 5
-
-    RateLimit:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:custom.rateLimitTable}
-        AttributeDefinitions:
-          - AttributeName: requestId
-            AttributeType: S
-        KeySchema:
-          - AttributeName: requestId
-            KeyType: HASH
-        ProvisionedThroughput:
-          ReadCapacityUnits: 5
-          WriteCapacityUnits: 5
-        TimeToLiveSpecification:
-          AttributeName: ttl
-          Enabled: true
-
 package:
   exclude:
     - docs/**
@@ -166,10 +118,8 @@ functions:
     handler: functions/accept.handler
     name: ${self:custom.prefix}-accept
     environment:
-      CONFIG: ${self:custom.config}
+      CONFIG_TABLE: ${self:custom.config}
       QUEUE_NAME: ${self:custom.sqs}
-      MUTEXES_TABLE: ${self:custom.mutexesTable}
-      RATE_LIMIT_TABLE: ${self:custom.rateLimitTable}
       CONTENT_BUCKET: ${self:custom.contentBucket}
     events:
       - http:
@@ -181,10 +131,8 @@ functions:
     handler: functions/pollQueue.handler
     name: ${self:custom.prefix}-pollQueue
     environment:
-      CONFIG: ${self:custom.config}
+      CONFIG_TABLE: ${self:custom.config}
       QUEUE_NAME: ${self:custom.sqs}
-      MUTEXES_TABLE: ${self:custom.mutexesTable}
-      RATE_LIMIT_TABLE: ${self:custom.rateLimitTable}
       CONTENT_BUCKET: ${self:custom.contentBucket}
       PROCESS_QUEUE_FUNCTION: ${self:custom.process}
     events:
@@ -195,8 +143,6 @@ functions:
     handler: functions/processQueueItem.handler
     name: ${self:custom.process}
     environment:
-      CONFIG: ${self:custom.config}
+      CONFIG_TABLE: ${self:custom.config}
       QUEUE_NAME: ${self:custom.sqs}
-      MUTEXES_TABLE: ${self:custom.mutexesTable}
-      RATE_LIMIT_TABLE: ${self:custom.rateLimitTable}
       CONTENT_BUCKET: ${self:custom.contentBucket}

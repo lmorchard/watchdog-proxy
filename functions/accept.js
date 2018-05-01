@@ -1,9 +1,10 @@
 "use strict";
 
-const { promisifyMethods } = require("../lib/utils");
-const { s3, sqs } = require("../lib/aws");
+const AWS = require("aws-sdk");
+const S3 = new AWS.S3({ apiVersion: "2006-03-01" });
+const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 
-const { CONFIG, QUEUE_NAME, LOCKS_TABLE, CONTENT_BUCKET } = process.env;
+const { CONFIG_TABLE, QUEUE_NAME, LOCKS_TABLE, CONTENT_BUCKET } = process.env;
 
 module.exports.handler = async function(
   {
@@ -26,23 +27,23 @@ module.exports.handler = async function(
   const responseBody = { requestId };
 
   console.time("acceptS3");
-  const result = await s3.putObject({
+  const result = await S3.putObject({
     Bucket: CONTENT_BUCKET,
     Key: requestId,
     Body: "THIS WILL BE AN IMAGE SOMEDAY"
-  });
+  }).promise();
   responseBody.s3Result = result;
   console.timeEnd("acceptS3");
 
   console.time("acceptSQS");
-  const { QueueUrl } = await sqs.getQueueUrl({ QueueName: QUEUE_NAME });
-  const { MessageId } = await sqs.sendMessage({
+  const { QueueUrl } = await SQS.getQueueUrl({ QueueName: QUEUE_NAME }).promise();
+  const { MessageId } = await SQS.sendMessage({
     MessageBody: JSON.stringify({
       nowish: Date.now(),
       requestId
     }),
     QueueUrl
-  });
+  }).promise();
   responseBody.sqsResult = "SUCCESS " + MessageId;
   console.timeEnd("acceptSQS");
 

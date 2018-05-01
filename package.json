@@ -43,9 +43,6 @@
     ]
   },
   "dependencies": {
-    "alai": "^1.0.3",
-    "dynamodb-mutex": "^1.3.4",
-    "lawos": "^1.1.5",
     "request": "^2.85.0",
     "request-promise-native": "^1.0.5",
     "uuid": "^3.2.1"

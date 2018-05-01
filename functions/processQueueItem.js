@@ -1,10 +1,10 @@
 "use strict";
 
-const promisify = require("util");
+const AWS = require("aws-sdk");
+const S3 = new AWS.S3({ apiVersion: "2006-03-01" });
+const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 const request = require("request-promise-native");
-const { promisifyMethods } = require("../lib/utils");
-const { s3, sqs, dbd, mutex } = require("../lib/aws");
-const { CONFIG, QUEUE_NAME, RATE_LIMIT_TABLE, CONTENT_BUCKET } = process.env;
+const { CONFIG_TABLE, QUEUE_NAME, CONTENT_BUCKET } = process.env;
 
 module.exports.handler = async function(
   { MessageId, ReceiptHandle, Body },
@@ -15,22 +15,22 @@ module.exports.handler = async function(
   console.log("MESSAGE BODY", requestId);
 
   try {
-    const getResult = await s3.getObject({
+    const getResult = await S3.getObject({
       Bucket: CONTENT_BUCKET,
       Key: requestId  
-    });
+    }).promise();
     console.log("GET", getResult);
     
-    await s3.deleteObject({
+    await S3.deleteObject({
       Bucket: CONTENT_BUCKET,
       Key: requestId
-    });
+    }).promise();
 
-    const response = await request(`https://webhook.site/8144d2bb-75cf-4e21-88c4-8442e63c0e60?requestId=${requestId}`);
+    const response = await request(`https://webhook.site/c0a8dd46-1405-4172-a99a-0646663f3dc2?requestId=${requestId}`);
   } catch (err) {
     console.log("REQUEST ERROR", err);
   }
 
-  const { QueueUrl } = await sqs.getQueueUrl({ QueueName: QUEUE_NAME });
-  await sqs.deleteMessage({ QueueUrl, ReceiptHandle });
+  const { QueueUrl } = await SQS.getQueueUrl({ QueueName: QUEUE_NAME }).promise();
+  await SQS.deleteMessage({ QueueUrl, ReceiptHandle }).promise();
 };
